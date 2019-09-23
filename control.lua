@@ -611,7 +611,22 @@ function tell:ValidB() return (isvalid(self.b)) end
 function tell:DestroyA() if(self:ValidA())then self.AEnergy=self.a.energy self.a.destroy() self.a=nil end end
 function tell:DestroyB() if(self:ValidB())then self.BEnergy=self.b.energy self.b.destroy() self.b=nil end end
 function tell:Destroy() self:DestroyA() self:DestroyB() end
-function tell:ConnectCircuit() self.a.connect_neighbour({target_entity=self.b,wire=defines.wire_type.red}) self.a.connect_neighbour({target_entity=self.b,wire=defines.wire_type.green}) end
+--Spawns a big electric poles on a dummy surface to carry the signal across entities of different position.
+--This creates garbage if the circuits are removed as poles are not (yet) cleaned up.
+function tell:ConnectCircuit()
+	if self.a.position.x == self.b.position.x and self.a.position.y == self.b.position.y then --Old behavior
+		self.a.connect_neighbour({target_entity=self.b,wire=defines.wire_type.red}) self.a.connect_neighbour({target_entity=self.b,wire=defines.wire_type.green})
+	else
+		local wire_reach = game.entity_prototypes("big-electric-pole").maximum_wire_distance
+		local surface = game.surfaces["warpfloor_circuits"]
+		local connectora = surface.create_entity{name="big-electric-pole", position=self.a.position, force=self.a.force }
+		local connectorb = surface.create_entity{name="big-electric-pole", position=self.a.position, force=self.a.force }
+		self.a.connect_neighbour({target_entity=connectora,wire=defines.wire_type.red}) self.a.connect_neighbour({target_entity=connectora,wire=defines.wire_type.green})
+		connectora.connect_neighbour({target_entity=connectorb,wire=defines.wire_type.red}) self.a.connect_neighbour({target_entity=connectorb,wire=defines.wire_type.green})
+		conenctorb.teleport(self.b.position)
+		self.b.connect_neighbour({target_entity=connectorb,wire=defines.wire_type.red}) self.b.connect_neighbour({target_entity=connectorb,wire=defines.wire_type.green})
+	end
+end
 
 function tell:MakeChest(o,k) local e=self.chests[o][k] local ex=warptorio.GetChest(self.dir[o][k])
 	if(e and e.name~=ex)then local v=entity.protect(entity.create(e.surface,ex,e.position),false,false) entity.copy.chest(e,v) entity.destroy(e) self.chests[o][k]=v if(self.dir[o][k]=="input")then entity.ChestRequestMode(v) end end
@@ -1191,6 +1206,7 @@ end
 function warptorio.init.floors()
 	if(not gwarptorio.floor)then gwarptorio.floor={} end
 	local m=gwarptorio.floor.main if(not m)then m=new(FLOOR,"main",8) m.surface=game.surfaces["nauvis"] end
+	local m=gwarptorio.floor.circuits if(not m)then m=new(FLOOR,"circuits",16) m:MakeEmptySurface() end
 	local m=gwarptorio.floor.b1 if(not m)then m=new(FLOOR,"b1",16) m:MakeEmptySurface() end
 	local m=gwarptorio.floor.b2 if(not m)then m=new(FLOOR,"b2",17) m:MakeEmptySurface() end
 	local m=gwarptorio.floor.b3 if(not m)then m=new(FLOOR,"b3",17) m.ovalsize={x=19,y=17} m:MakeEmptySurface() end
